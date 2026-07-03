@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoring Harian Livin' Food — Region X</title>
+<style>
+  :root{
+    --blue:#003a70;--blue-dk:#002347;--gold:#f9b500;
+    --bg:#eef2f6;--card:#fff;--text:#1c2733;--muted:#6b7787;
+    --ok:#1e8e3e;--ok-bg:#e6f4ea;
+    --warn:#b06000;--warn-bg:#fff3e0;
+    --err:#c5221f;--err-bg:#fdecea;
+    --border:#dbe2ea;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);padding-bottom:40px;}
+  header{background:linear-gradient(135deg,var(--blue),var(--blue-dk));color:#fff;padding:20px 18px 28px;text-align:center;}
+  header h1{font-size:17px;font-weight:700;margin-bottom:3px;}
+  header p{font-size:11.5px;color:#cfe0f0;}
+  .bar{height:3px;width:46px;background:var(--gold);margin:11px auto 0;border-radius:2px;}
+  .wrap{max-width:900px;margin:-14px auto 0;padding:0 14px;}
+
+  /* Tabs */
+  .tabs{display:flex;gap:3px;padding:10px 0 0;}
+  .tab{flex:1;padding:9px 6px;border:none;border-radius:9px 9px 0 0;font-size:12.5px;font-weight:600;
+       cursor:pointer;background:#cfd8e3;color:var(--muted);}
+  .tab.active{background:var(--card);color:var(--blue);}
+  .panel{background:var(--card);border-radius:0 0 13px 13px;padding:16px 14px;box-shadow:0 4px 18px rgba(0,30,60,.09);}
+  .panel.hidden{display:none;}
+
+  /* Controls */
+  .ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .day-badge{padding:4px 12px;border-radius:12px;font-size:11.5px;font-weight:700;background:var(--blue);color:#fff;}
+  input[type=date]{padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:#fbfcfe;}
+  .btn{padding:7px 15px;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .btn-blue{background:var(--blue);color:#fff;}
+  .btn-blue:hover{background:var(--blue-dk);}
+  #loadMsg{font-size:12.5px;color:var(--muted);}
+
+  /* Summary cards */
+  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;}
+  @media(max-width:520px){.cards{grid-template-columns:repeat(3,1fr);}}
+  .scard{background:var(--bg);border-radius:9px;padding:10px 8px;text-align:center;}
+  .scard .val{font-size:22px;font-weight:700;margin-bottom:2px;}
+  .scard .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;line-height:1.3;}
+  .scard.total .val{color:var(--blue);}
+  .scard.ok .val{color:var(--ok);}
+  .scard.warn .val{color:var(--warn);}
+  .scard.miss .val{color:var(--err);}
+  .scard.pct .val{color:#7b2d8b;}
+  .pbar-wrap{background:var(--border);border-radius:5px;height:7px;margin-bottom:14px;overflow:hidden;}
+  .pbar{height:100%;border-radius:5px;background:var(--ok);transition:width .4s;}
+
+  /* Filters */
+  .filter-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+  .pill{padding:4px 12px;border-radius:14px;font-size:12px;font-weight:600;cursor:pointer;
+        border:1.5px solid var(--border);background:#fff;color:var(--muted);}
+  .pill.active{border-color:var(--blue);background:var(--blue);color:#fff;}
+
+  /* Table */
+  .tbl-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{background:#f4f7fb;padding:8px 10px;text-align:left;font-weight:700;font-size:11.5px;
+     color:var(--blue);border-bottom:2px solid var(--border);white-space:nowrap;}
+  td{padding:8px 10px;border-bottom:1px solid #f0f3f7;vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#fafbfd;}
+  tr.hidden-row{display:none;}
+  .code{font-family:monospace;font-size:11px;color:var(--muted);}
+  .nama-cell{font-weight:600;max-width:180px;}
+  .area-badge{display:inline-block;padding:2px 7px;border-radius:8px;font-size:10.5px;
+              font-weight:600;background:var(--bg);color:var(--blue);}
+
+  /* Merchant tags */
+  .mtag{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11.5px;font-weight:600;white-space:nowrap;}
+  .m-konijiwa{background:#e8f0fe;color:#1a56db;}
+  .m-darikopi{background:#fef3cd;color:#7d5a00;}
+  .m-coto{background:#fce8e8;color:#c5221f;}
+  .m-masdaeng{background:#e6f4ea;color:#1e8e3e;}
+  .m-eksposed{background:#f4e8fc;color:#7b2d8b;}
+  .m-other{background:#f4f7fb;color:var(--muted);}
+
+  /* QTY */
+  .qty-cell{display:flex;align-items:center;gap:3px;}
+  .qty-val{font-weight:700;font-size:13px;}
+  .qty-slash{color:var(--muted);font-size:11px;}
+
+  /* Status chips */
+  .chip{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:10px;
+        font-size:11px;font-weight:600;white-space:nowrap;}
+  .chip-ok{background:var(--ok-bg);color:var(--ok);}
+  .chip-warn{background:var(--warn-bg);color:var(--warn);}
+  .chip-err{background:var(--err-bg);color:var(--err);}
+
+  /* Jadwal tab */
+  .jadwal-day-header{font-size:13.5px;font-weight:700;color:var(--blue);
+                     margin:12px 0 8px;padding-bottom:5px;border-bottom:2px solid var(--border);}
+  .jadwal-group{margin-bottom:14px;}
+  .merchant-group-hdr{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .jadwal-list{display:flex;flex-wrap:wrap;gap:5px;}
+  .jadwal-item{padding:4px 10px;background:var(--bg);border-radius:8px;font-size:12px;border:1px solid var(--border);}
+  .jadwal-item .jcode{font-family:monospace;font-size:10.5px;color:var(--muted);margin-right:4px;}
+
+  #noDataMsg{text-align:center;padding:28px;color:var(--muted);font-size:13px;}
+  #errMsg{color:var(--err);font-size:12.5px;padding:10px 0;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Monitoring Harian Livin' Food</h1>
+  <p>Region X &mdash; Merchant Lokal Makassar &amp; Unit Region</p>
+  <div class="bar"></div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab" onclick="switchTab('jadwal')">📋 Jadwal Hari Ini</button>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div class="panel" id="panelDashboard">
+    <div class="ctrl">
+      <span class="day-badge" id="dayBadge">-</span>
+      <input type="date" id="dateInput">
+      <button class="btn btn-blue" onclick="loadData()">Muat Data</button>
+      <span id="loadMsg"></span>
+    </div>
+
+    <div id="summaryWrap" style="display:none;">
+      <div class="cards">
+        <div class="scard total"><div class="val" id="cTotal">40</div><div class="lbl">Total<br>Entitas</div></div>
+        <div class="scard ok"><div class="val" id="cOk">0</div><div class="lbl">✅ Sesuai<br>Merchant+QTY</div></div>
+        <div class="scard warn"><div class="val" id="cWarn">0</div><div class="lbl">⚠️ Ada<br>Ketidaksesuaian</div></div>
+        <div class="scard miss"><div class="val" id="cMiss">0</div><div class="lbl">❌ Belum<br>Submit</div></div>
+        <div class="scard pct"><div class="val" id="cPct">0%</div><div class="lbl">Compliance<br>Rate</div></div>
+      </div>
+      <div class="pbar-wrap"><div class="pbar" id="pbar" style="width:0%"></div></div>
+    </div>
+
+    <div class="filter-row" id="filterRow" style="display:none;">
+      <button class="pill active" onclick="setFilter('all',this)">Semua</button>
+      <button class="pill" onclick="setFilter('ok',this)">✅ Sesuai</button>
+      <button class="pill" onclick="setFilter('warn',this)">⚠️ Beda</button>
+      <button class="pill" onclick="setFilter('miss',this)">❌ Belum</button>
+      <span style="flex:1"></span>
+      <button class="pill" onclick="setArea('all',this)" style="border-color:var(--blue);color:var(--blue);">Semua Area</button>
+      <button class="pill" onclick="setArea('kartini',this)">Mks Kartini</button>
+      <button class="pill" onclick="setArea('ratulangi',this)">Mks Ratulangi</button>
+      <button class="pill" onclick="setArea('r10',this)">R10</button>
+      <button class="pill" onclick="setArea('r10ho',this)">R10HO</button>
+    </div>
+
+    <div id="errMsg"></div>
+    <div class="tbl-wrap" id="tblWrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>Kode</th>
+            <th>Nama Cabang / Unit</th>
+            <th>Area</th>
+            <th>Merchant Wajib</th>
+            <th>QTY Target / Submit</th>
+            <th>Merchant Aktual</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+    </div>
+    <div id="noDataMsg">Pilih tanggal dan klik <strong>Muat Data</strong>.</div>
+  </div>
+
+  <!-- ===== JADWAL HARI INI ===== -->
+  <div class="panel hidden" id="panelJadwal">
+    <div id="jadwalContent"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// KONFIGURASI — isi dengan URL Web App Apps Script Anda
+// ============================================================
+const SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_DI_SINI";
+
+// ============================================================
+// DATA JADWAL (40 entitas non-KFC, Senin-Minggu)
+// jadwal index: 0=Senin,1=Selasa,2=Rabu,3=Kamis,4=Jumat,5=Sabtu,6=Minggu
+// ============================================================
+const JADWAL = [
+  {area:"Area Makassar Kartini",kode:"15200",nama:"Makassar Kartini",qty:3,jadwal:["Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa"]},
+  {area:"Area Makassar Kartini",kode:"15201",nama:"Makassar Sulawesi",qty:3,jadwal:["Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa"]},
+  {area:"Area Makassar Kartini",kode:"15202",nama:"Makassar Cokroaminoto",qty:3,jadwal:["Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang"]},
+  {area:"Area Makassar Kartini",kode:"15213",nama:"Makassar Slamet Riyadi",qty:3,jadwal:["Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang"]},
+  {area:"Area Makassar Kartini",kode:"15220",nama:"Makassar Andalas",qty:3,jadwal:["Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang"]},
+  {area:"Area Makassar Kartini",kode:"15221",nama:"Makassar Veteran",qty:3,jadwal:["Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa"]},
+  {area:"Area Makassar Kartini",kode:"15225",nama:"Makassar Stella Maris",qty:3,jadwal:["Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi"]},
+  {area:"Area Makassar Kartini",kode:"15238",nama:"Makassar Pelabuhan Indonesia",qty:3,jadwal:["Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi"]},
+  {area:"Area Makassar Kartini",kode:"15242",nama:"Makassar Pasar Sentral",qty:3,jadwal:["Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi"]},
+  {area:"Area Makassar Kartini",kode:"15243",nama:"Makassar Sombaopu",qty:3,jadwal:["Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi"]},
+  {area:"Area Makassar Kartini",kode:"15249",nama:"Makassar Urip Sumoharjo",qty:3,jadwal:["Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang"]},
+  {area:"Area Makassar Kartini",kode:"15250",nama:"Makassar Monginsidi",qty:3,jadwal:["Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang"]},
+  {area:"Area Makassar Kartini",kode:"15251",nama:"Makassar CPI",qty:3,jadwal:["Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi"]},
+  {area:"Area Makassar Kartini",kode:"15252",nama:"Makassar Latimojong",qty:3,jadwal:["Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa","Darikopi","Coto Dg Tayang","Konijiwa"]},
+  {area:"Area Makassar Ratulangi",kode:"17400",nama:"Makassar Sam Ratulangi",qty:3,jadwal:["Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng"]},
+  {area:"Area Makassar Ratulangi",kode:"17401",nama:"Makassar Panakkukang",qty:3,jadwal:["Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed"]},
+  {area:"Area Makassar Ratulangi",kode:"17402",nama:"Makassar Hertasning",qty:3,jadwal:["Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed"]},
+  {area:"Area Makassar Ratulangi",kode:"17404",nama:"Makassar Cendrawasih",qty:3,jadwal:["Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng"]},
+  {area:"Area Makassar Ratulangi",kode:"17406",nama:"Makassar Toddopuli",qty:3,jadwal:["Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed"]},
+  {area:"Area Makassar Ratulangi",kode:"17408",nama:"Makassar Pettarani",qty:3,jadwal:["Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed"]},
+  {area:"Area Makassar Ratulangi",kode:"17409",nama:"Makassar Veteran Selatan",qty:3,jadwal:["Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng","Eksposed","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Transaction Banking Retail Region X / Sulawesi & Maluku",qty:2,jadwal:["Konijiwa","Eksposed","Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Government Business X",qty:1,jadwal:["Konijiwa","Mas Daeng","Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Regional Financial X / Sulawesi & Maluku",qty:2,jadwal:["Konijiwa","Mas Daeng","Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Regional Human Capital X",qty:2,jadwal:["Konijiwa","Mas Daeng","Mas Daeng","Darikopi","Coto Dg Tayang","Konijiwa","Eksposed"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Regional Legal X",qty:1,jadwal:["Konijiwa","Mas Daeng","Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Transaction Banking Wholesale Region X / Sulawesi & Maluku",qty:2,jadwal:["Konijiwa","Mas Daeng","Eksposed","Eksposed","Coto Dg Tayang","Mas Daeng","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Wealth Business Region X / Sulawesi & Maluku",qty:1,jadwal:["Konijiwa","Mas Daeng","Eksposed","Darikopi","Coto Dg Tayang","Mas Daeng","Eksposed"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Regional Business Control X / Sulawesi & Maluku",qty:2,jadwal:["Mas Daeng","Mas Daeng","Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Business Support X",qty:2,jadwal:["Konijiwa","Mas Daeng","Mas Daeng","Darikopi","Eksposed","Konijiwa","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Retail Funding Region X / Sulawesi & Maluku",qty:2,jadwal:["Konijiwa","Mas Daeng","Eksposed","Darikopi","Eksposed","Konijiwa","Mas Daeng"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Credit Card Region X / Sulawesi & Maluku",qty:2,jadwal:["Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng","Eksposed","Darikopi"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"SME",qty:2,jadwal:["Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng","Eksposed","Darikopi"]},
+  {area:"Region X/Sulawesi & Maluku",kode:"R10",nama:"Regional CEO & L3+",qty:1,jadwal:["RCEO","L3+","L3+","L3+","RCEO","L3+","L3+"]},
+  {area:"Region X/Under HO",kode:"R10HO",nama:"Personal Loan X",qty:1,jadwal:["Darikopi","Coto Dg Tayang","Eksposed","Mas Daeng","Konijiwa","Eksposed","Coto Dg Tayang"]},
+  {area:"Region X/Under HO",kode:"R10HO",nama:"Retail Credit Operations",qty:2,jadwal:["Darikopi","Coto Dg Tayang","Eksposed","Mas Daeng","Konijiwa","Eksposed","Coto Dg Tayang"]},
+  {area:"Region X/Under HO",kode:"R10HO",nama:"Treasury Makassar",qty:2,jadwal:["Darikopi","Coto Dg Tayang","Eksposed","Mas Daeng","Konijiwa","Eksposed","Coto Dg Tayang"]},
+  {area:"Region X/Under HO",kode:"R10HO",nama:"Micro Bkg X",qty:2,jadwal:["Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng","Eksposed","Darikopi"]},
+  {area:"Region X/Under HO",kode:"R10HO",nama:"Mortgage Auto Loan X",qty:2,jadwal:["Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng","Eksposed","Darikopi"]},
+  {area:"Region X/Under HO",kode:"R10HO",nama:"Transaction Operations X",qty:2,jadwal:["Eksposed","Darikopi","Coto Dg Tayang","Konijiwa","Mas Daeng","Eksposed","Darikopi"]}
+];
+
+// ============================================================
+// KONSTANTA
+// ============================================================
+const DAYS = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+// JS getDay(): 0=Sun,1=Mon,...,6=Sat → jadwal index: Mon=0,...,Sun=6
+const JS_TO_IDX = {1:0,2:1,3:2,4:3,5:4,6:5,0:6};
+
+const MERCHANT_CSS = {
+  "Konijiwa":"m-konijiwa",
+  "Darikopi":"m-darikopi",
+  "Coto Dg Tayang":"m-coto",
+  "Mas Daeng":"m-masdaeng",
+  "Eksposed":"m-eksposed"
+};
+
+const AREA_FILTER = {
+  "kartini": function(e){ return e.area === "Area Makassar Kartini"; },
+  "ratulangi": function(e){ return e.area === "Area Makassar Ratulangi"; },
+  "r10": function(e){ return e.kode === "R10"; },
+  "r10ho": function(e){ return e.kode === "R10HO"; },
+  "all": function(){ return true; }
+};
+
+// ============================================================
+// HELPERS
+// ============================================================
+function todayDayIndex() {
+  return JS_TO_IDX[new Date().getDay()];
+}
+
+function dateToDayIndex(dateStr) {
+  // dateStr: "YYYY-MM-DD"
+  var d = new Date(dateStr + "T00:00:00");
+  return JS_TO_IDX[d.getDay()];
+}
+
+function merchantTag(name) {
+  var cls = MERCHANT_CSS[name] || "m-other";
+  return '<span class="mtag ' + cls + '">' + (name || "—") + '</span>';
+}
+
+function normMerchant(s) {
+  return (s || "").toLowerCase().trim();
+}
+
+function merchantMatch(scheduled, actual) {
+  if (!scheduled || !actual) return false;
+  var sch = normMerchant(scheduled);
+  var act = normMerchant(actual);
+  return act === sch || act.indexOf(sch) !== -1 || sch.indexOf(act) !== -1;
+}
+
+// Match a submission row to a JADWAL entry
+// Returns matched JADWAL entry or null
+function matchEntry(sub) {
+  var area = (sub.area || "").trim();
+  var cabang = (sub.cabang || "").trim();
+  var unit = (sub.unit || "").trim();
+
+  if (area !== "Region") {
+    // Extract kode from cabang "15200 - ..."
+    var kode = cabang.split("-")[0].trim().replace(/\s/g,"");
+    for (var i = 0; i < JADWAL.length; i++) {
+      if (JADWAL[i].kode === kode) return JADWAL[i];
+    }
+    // fallback: name match
+    var cname = cabang.indexOf(" - ") !== -1 ? cabang.split(" - ").slice(1).join(" - ").trim() : cabang;
+    var cnameLow = cname.toLowerCase();
+    for (var j = 0; j < JADWAL.length; j++) {
+      if (JADWAL[j].nama.toLowerCase().indexOf(cnameLow) !== -1 && cnameLow.length > 3) return JADWAL[j];
+    }
+  } else {
+    // Region submission: match by unit name
+    var unitLow = unit.toLowerCase();
+    // Special case: Regional CEO or L3+ → map to "Regional CEO & L3+"
+    if (unitLow === "regional ceo" || unitLow === "l3+") {
+      for (var k = 0; k < JADWAL.length; k++) {
+        if (JADWAL[k].nama === "Regional CEO & L3+") return JADWAL[k];
+      }
+    }
+    // General: find entry where unit name is a substring match
+    var best = null, bestLen = 0;
+    for (var m = 0; m < JADWAL.length; m++) {
+      var entNamLow = JADWAL[m].nama.toLowerCase();
+      if (entNamLow.indexOf(unitLow) !== -1 || unitLow.indexOf(entNamLow) !== -1) {
+        if (JADWAL[m].nama.length > bestLen) { best = JADWAL[m]; bestLen = JADWAL[m].nama.length; }
+      }
+    }
+    return best;
+  }
+  return null;
+}
+
+// ============================================================
+// TAB SWITCH
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll(".tab").forEach(function(t,i){
+    t.classList.toggle("active",(i===0&&tab==="dashboard")||(i===1&&tab==="jadwal"));
+  });
+  document.getElementById("panelDashboard").classList.toggle("hidden", tab !== "dashboard");
+  document.getElementById("panelJadwal").classList.toggle("hidden", tab !== "jadwal");
+  if (tab === "jadwal") renderJadwal();
+}
+
+// ============================================================
+// FILTER STATE
+// ============================================================
+var curStatusFilter = "all";
+var curAreaFilter = "all";
+
+function setFilter(f, el) {
+  curStatusFilter = f;
+  document.querySelectorAll(".filter-row .pill").forEach(function(p){ p.classList.remove("active"); });
+  el.classList.add("active");
+  applyFilters();
+}
+
+function setArea(f, el) {
+  curAreaFilter = f;
+  // only toggle area pills (those with onclick=setArea)
+  el.parentNode.querySelectorAll(".pill").forEach(function(p){
+    if (p.getAttribute("onclick") && p.getAttribute("onclick").indexOf("setArea") !== -1) {
+      p.classList.remove("active");
+    }
+  });
+  el.classList.add("active");
+  applyFilters();
+}
+
+function applyFilters() {
+  var rows = document.querySelectorAll("#tblBody tr");
+  rows.forEach(function(row){
+    var st = row.getAttribute("data-status");
+    var ar = row.getAttribute("data-area");
+    var hideStatus = curStatusFilter !== "all" && st !== curStatusFilter;
+    var hideArea = curAreaFilter !== "all" && ar !== curAreaFilter;
+    row.classList.toggle("hidden-row", hideStatus || hideArea);
+  });
+}
+
+// ============================================================
+// LOAD DATA FROM APPS SCRIPT
+// ============================================================
+function loadData() {
+  var date = document.getElementById("dateInput").value;
+  if (!date){ alert("Pilih tanggal terlebih dahulu."); return; }
+  if (SCRIPT_URL.indexOf("PASTE_URL") === 0) {
+    document.getElementById("errMsg").textContent = "⚠️ SCRIPT_URL belum diisi. Lihat README.";
+    return;
+  }
+  document.getElementById("errMsg").textContent = "";
+  document.getElementById("loadMsg").textContent = "⏳ Memuat...";
+
+  fetch(SCRIPT_URL + "?action=getData&date=" + encodeURIComponent(date))
+    .then(function(r){ return r.json(); })
+    .then(function(json){
+      document.getElementById("loadMsg").textContent = "";
+      if (json.status !== "success") throw new Error(json.message || "Gagal.");
+      renderDashboard(json.data, date);
+    })
+    .catch(function(err){
+      document.getElementById("loadMsg").textContent = "";
+      document.getElementById("errMsg").textContent = "❌ " + err.message;
+    });
+}
+
+// ============================================================
+// RENDER DASHBOARD
+// ============================================================
+function renderDashboard(submissions, date) {
+  var dayIdx = dateToDayIndex(date);
+
+  // Build submission map: JADWAL index → [{merchant, nip, nama}]
+  var subMap = {};
+  submissions.forEach(function(sub){
+    var entry = matchEntry(sub);
+    if (!entry) return;
+    var idx = JADWAL.indexOf(entry);
+    if (idx === -1) return;
+    if (!subMap[idx]) subMap[idx] = [];
+    subMap[idx].push(sub);
+  });
+
+  var totalOk=0, totalWarn=0, totalMiss=0;
+  var rows = "";
+
+  JADWAL.forEach(function(entry, idx){
+    var subs = subMap[idx] || [];
+    var scheduledMerchant = entry.jadwal[dayIdx];
+    var submitCount = subs.length;
+    var merchantActual = submitCount > 0 ? subs[0].merchant : "";
+    // Check if any submission has correct merchant
+    var anyMerchantOk = subs.some(function(s){ return merchantMatch(scheduledMerchant, s.merchant); });
+    var qtyOk = submitCount >= entry.qty;
+
+    var status, chipHtml;
+    if (submitCount === 0) {
+      status = "miss";
+      chipHtml = '<span class="chip chip-err">❌ Belum Submit</span>';
+      totalMiss++;
+    } else if (!anyMerchantOk) {
+      status = "warn";
+      chipHtml = '<span class="chip chip-warn">⚠️ Merchant Beda</span>';
+      totalWarn++;
+    } else if (!qtyOk) {
+      status = "warn";
+      chipHtml = '<span class="chip chip-warn">⚠️ QTY Kurang</span>';
+      totalWarn++;
+    } else {
+      status = "ok";
+      chipHtml = '<span class="chip chip-ok">✅ Sesuai</span>';
+      totalOk++;
+    }
+
+    var qtyColor = submitCount === 0 ? "var(--muted)" : (qtyOk ? "var(--ok)" : "var(--warn)");
+    var areaKey = entry.area === "Area Makassar Kartini" ? "kartini"
+                : entry.area === "Area Makassar Ratulangi" ? "ratulangi"
+                : entry.kode === "R10" ? "r10" : "r10ho";
+    var areaShort = entry.area === "Area Makassar Kartini" ? "Mks Kartini"
+                  : entry.area === "Area Makassar Ratulangi" ? "Mks Ratulangi"
+                  : entry.area;
+
+    rows += '<tr data-status="' + status + '" data-area="' + areaKey + '">' +
+      '<td class="code">' + entry.kode + '</td>' +
+      '<td class="nama-cell">' + entry.nama + '</td>' +
+      '<td><span class="area-badge">' + areaShort + '</span></td>' +
+      '<td>' + merchantTag(scheduledMerchant) + '</td>' +
+      '<td><div class="qty-cell"><span class="qty-val" style="color:' + qtyColor + '">' + submitCount + '</span><span class="qty-slash">/' + entry.qty + '</span></div></td>' +
+      '<td>' + (merchantActual ? merchantTag(merchantActual) : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td>' + chipHtml + '</td>' +
+    '</tr>';
+  });
+
+  var total = JADWAL.length;
+  var pct = Math.round(totalOk / total * 100);
+
+  document.getElementById("cOk").textContent = totalOk;
+  document.getElementById("cWarn").textContent = totalWarn;
+  document.getElementById("cMiss").textContent = totalMiss;
+  document.getElementById("cPct").textContent = pct + "%";
+  document.getElementById("pbar").style.width = pct + "%";
+  document.getElementById("summaryWrap").style.display = "block";
+  document.getElementById("filterRow").style.display = "flex";
+  document.getElementById("tblBody").innerHTML = rows;
+  document.getElementById("tblWrap").style.display = "block";
+  document.getElementById("noDataMsg").style.display = "none";
+  curStatusFilter = "all"; curAreaFilter = "all";
+  applyFilters();
+}
+
+// ============================================================
+// JADWAL HARI INI TAB
+// ============================================================
+function renderJadwal() {
+  var date = document.getElementById("dateInput").value;
+  var dayIdx = date ? dateToDayIndex(date) : todayDayIndex();
+  var dayName = DAYS[date ? new Date(date+"T00:00:00").getDay() : new Date().getDay()];
+
+  // Group by merchant
+  var groups = {};
+  JADWAL.forEach(function(entry){
+    var m = entry.jadwal[dayIdx];
+    if (!groups[m]) groups[m] = [];
+    groups[m].push(entry);
+  });
+
+  var html = '<div class="jadwal-day-header">📅 ' + dayName + (date ? " — " + date : " (Hari Ini)") + '</div>';
+
+  Object.keys(groups).sort().forEach(function(merchant){
+    var entries = groups[merchant];
+    html += '<div class="jadwal-group">' +
+      '<div class="merchant-group-hdr">' + merchantTag(merchant) +
+        '<span style="font-size:12px;color:var(--muted);">' + entries.length + ' entitas</span>' +
+      '</div>' +
+      '<div class="jadwal-list">';
+    entries.forEach(function(e){
+      html += '<div class="jadwal-item"><span class="jcode">' + e.kode + '</span>' + e.nama + '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  document.getElementById("jadwalContent").innerHTML = html;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(function init(){
+  var today = new Date();
+  var y = today.getFullYear();
+  var mo = String(today.getMonth()+1).padStart(2,"0");
+  var d = String(today.getDate()).padStart(2,"0");
+  document.getElementById("dateInput").value = y+"-"+mo+"-"+d;
+  var jsDay = today.getDay();
+  document.getElementById("dayBadge").textContent = DAYS[jsDay].toUpperCase();
+})();
+</script>
+</body>
+</html>
